@@ -1,0 +1,61 @@
+NAME
+    get_simulated_read
+
+FILE
+
+
+DESCRIPTION
+    -
+    This program create reads from genomes by using art_Illumina Q version and the error profiles of MiSeq.
+    
+    input: file with sequence ID, genome name, folder, abundance, sequence length
+    output:     1st file: fastaq -format, 250bp long reads, Insert size 450bp with standard deviation 25%
+                2nd file: output in .sam format
+
+	arguments:
+
+	-r	choose readsimulator: 'pacbio', 'art' or 'pirs'
+	-i	input: tab seperated table with genome & sequence ID, genome folder and abundance
+	-o	directory_output
+
+	formula for coverage:
+	c(i)=a(i)*outputsize/sum(s(i)*a(i))
+		
+		c(i) = coverage for genome i
+		a(i) = abundance for sequence i
+		s(i) = sequence length of sequence i
+		outputsize = size of all simulated genomes together
+		
+    
+    example for use:
+    python get_simulated_read.py -r art -i some_table.csv -o output/
+
+FUNCTIONS
+    choose_reader(reader_type, dict_ID_abundance, error_profile, directory_output, factor, log_file)
+	#choose reader
+    
+    main()
+        #parser
+    
+    read_input(list_genomes, directory_output)
+        #read input of genome abundance list
+    
+    start_PBSIM(dict_ID_abundance, error_profile, directory_output, factor)
+        #start PBSIM readsimulator
+    
+    start_art(dict_ID_abundance, error_profile, directory_output, factor, log_file)
+        #start ART readsimulator
+    
+    start_pirs(dict_ID_abundance, directory_output)
+        #start pIRS readsimulator
+
+DATA
+    __author__ = 'majda'
+    directory_output = '/net/metagenomics/projects/cami_2014/readsimulator...
+    error_profile = '/net/metagenomics/projects/cami_2014/readsimulator/pr...
+    list_genomes = '/net/metagenomics/projects/cami_2014/community_design/...
+
+AUTHOR
+    majda
+
+
