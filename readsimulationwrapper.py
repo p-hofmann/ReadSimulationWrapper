@@ -10,7 +10,7 @@ output:     1st file: fastaq -format, 250bp long reads, Insert size 450bp with s
 			2nd file: output in .sam format
 
 example for use:
-python get_simulated_read.py 1000000 readsim_folder/ -r art -i community_file.tsv -o directory_output/ -ep mi -max 50
+TODO:
 """
 
 # TODO: genome_id, abundance, genome_length, file_path_genome
