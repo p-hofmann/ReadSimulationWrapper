@@ -102,7 +102,7 @@ class ReadSimulationWrapper(SequenceValidator):
 			if max_abundance < abundance:
 				max_abundance = abundance
 
-			assert genome_id not in dict_id_abundance, "Genome '{}' not unique in the distribution file!".format(genome_id)
+			# TODO: assert genome_id not in dict_id_abundance, "Genome '{}' not unique in the distribution file!".format(genome_id)
 			# dict_id_file_path[genome_id] = file_path_genome
 			dict_id_abundance[genome_id] = abundance
 		# return dict_id_abundance, dict_id_file_path, relative_size_total, max_abundance
