@@ -16,7 +16,7 @@ python get_simulated_read.py 1000000 readsim_folder/ -r art -i community_file.ts
 # TODO: genome_id, abundance, genome_length, file_path_genome
 
 __original_author__ = 'majda'
-__author__ = 'peter hofmann'
+__author__ = 'Peter Hofmann'
 
 import os
 import argparse
