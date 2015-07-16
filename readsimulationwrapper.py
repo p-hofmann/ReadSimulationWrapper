@@ -13,8 +13,6 @@ example for use:
 TODO:
 """
 
-# TODO: genome_id, abundance, genome_length, file_path_genome
-
 __original_author__ = 'majda'
 __author__ = 'Peter Hofmann'
 
@@ -23,13 +21,15 @@ import argparse
 import tempfile
 from scripts.parallel import TaskCmd, runCmdParallel, reportFailedCmd
 from scripts.MetaDataTable.metadatatable import MetadataTable
-from scripts.Validator.sequencevalidator import SequenceValidator
+from scripts.GenomePreparation.genomepreparation import GenomePreparation
 import maf_converter
 
 
-class ReadSimulationWrapper(SequenceValidator):
+class ReadSimulationWrapper(GenomePreparation):
 
 	_label = "ReadSimulationWrapper"
+
+	_temporary_files = set()
 
 	def __init__(
 		self, file_path_executable,
@@ -56,7 +56,23 @@ class ReadSimulationWrapper(SequenceValidator):
 		self._fragment_size_standard_deviation = int(round(self._fragments_size_mean * 0.1))
 		self._read_length = 150
 
-	# TODO: validate genome: no description, len(sequences) >= min_sequence_length
+	def __exit__(self, type, value, traceback):
+		self._close()
+
+	def __enter__(self):
+		return self
+
+	def __del__(self):
+		self._close()
+
+	def _close(self):
+		self._logger = None
+		# delete temporary files
+		for file_path in self._temporary_files:
+			if os.path.isfile(file_path):
+				os.remove(file_path)
+
+	# TODO: validate genome: no description, still a problem ?
 
 	# read genome location file
 	def _read_genome_location_file(self, file_path):
@@ -74,39 +90,63 @@ class ReadSimulationWrapper(SequenceValidator):
 			dict_id_file_path[genome_id] = file_path_genome
 		return dict_id_file_path
 
-	# read genome distribution file
-	def _read_distribution_file(self, file_path, min_length):
-		self._logger.info('Genome distribution preparation')
+	def get_multiplication_factor(
+		self, dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
+		file_format="fasta", sequence_type="dna", ambiguous=True):
+
+		# factor is calculated based on total size of sample
+		# coverage = abundance * factor
+
 		relative_size_total = 0
-		max_abundance = 0
+		for genome_id, abundance in dict_id_abundance.iteritems():
+			min_seq_length, genome_length = self.get_sequence_lengths(
+				file_path=dict_id_file_path[genome_id],
+				file_format=file_format,
+				sequence_type=sequence_type,
+				ambiguous=ambiguous,
+				key=None,
+				silent=False)
+			if min_seq_length < min_sequence_length:
+				new_file_path = self._remove_short_sequences(
+					dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
+				dict_id_file_path[genome_id] = new_file_path
+				self._temporary_files.add(new_file_path)
+
+			relative_size = abundance * genome_length
+			relative_size_total += relative_size
+		return total_size / float(relative_size_total)
+
+	# read genome distribution file
+	def _read_distribution_file(self, file_path):
+		self._logger.info('Genome distribution preparation')
 		dict_id_abundance = {}
 		# dict_id_file_path = {}
 		metadata_table = MetadataTable(logfile=self._logfile, verbose=self._verbose, separator=self._separator)
 		iterator_distributions = metadata_table.parse_file(file_path, as_list=True)
 		# for genome_id, abundance, genome_length, file_path_genome in iterator_distributions:
-		for genome_id, abundance, genome_length in iterator_distributions:
+		for genome_id, abundance in iterator_distributions:
 			assert genome_id != '', "Invalid genom id: '{}'".format(genome_id)
 			assert abundance != '', "Invalid abundance: '{}'".format(genome_id)
-			assert genome_length != '', "Invalid genome_length: '{}'".format(genome_id)
 			abundance = float(abundance)
-			genome_length = long(genome_length)
 			# assert file_path_genome != '', "Invalid file path: '{}'".format(genome_id)
 			# assert self.validate_file(file_path_genome), "Invalid file path: '{}'".format(genome_id)
 			assert self.validate_number(abundance, zero=False), "Invalid abundance: '{}'".format(genome_id)
-			assert self.validate_number(genome_length, zero=False, minimum=min_length), "Invalid length: '{}'".format(genome_id)
 
-			relative_size = abundance * genome_length
-			relative_size_total += relative_size
-
-			# memorize max abundance
-			if max_abundance < abundance:
-				max_abundance = abundance
-
-			# TODO: assert genome_id not in dict_id_abundance, "Genome '{}' not unique in the distribution file!".format(genome_id)
+			assert genome_id not in dict_id_abundance, "Genome '{}' not unique in the distribution file!".format(genome_id)
 			# dict_id_file_path[genome_id] = file_path_genome
 			dict_id_abundance[genome_id] = abundance
 		# return dict_id_abundance, dict_id_file_path, relative_size_total, max_abundance
-		return dict_id_abundance, relative_size_total, max_abundance
+		return dict_id_abundance
+
+	def _remove_short_sequences(self, file_path, sequence_min_length, file_format="fasta"):
+		file_path_output = tempfile.mktemp(dir=self._tmp_dir)
+		with open(file_path, 'w') as stream_input, open(file_path_output, 'w') as stream_output:
+			self._stream_sequences_of_min_length(
+				stream_input, stream_output,
+				sequence_min_length=sequence_min_length,
+				file_format=file_format
+				)
+		return file_path_output
 
 
 # #################
@@ -158,14 +198,15 @@ class ReadSimulationArt(ReadSimulationWrapper):
 				assert fragment_size_standard_deviation is not None, "Both, mean and standard deviation, are required."
 		self._logger.info("Using '{}' error profile.".format(profile))
 
-		min_length = self._fragments_size_mean - self._fragment_size_standard_deviation
-		dict_id_abundance, relative_size_total, max_abundance = self._read_distribution_file(
-			file_path_distributions, min_length)
+		dict_id_abundance = self._read_distribution_file(file_path_distributions)
 		dict_id_file_path = self._read_genome_location_file(file_path_genome_locations)
 		assert set(dict_id_file_path.keys()).issuperset(dict_id_abundance.keys()), "Some ids do not have a genome location"
-		# coverage = abundance * factor
-		# factor is calculated based on total size of sample
-		factor = total_size/float(relative_size_total)
+
+		min_sequence_length = self._fragments_size_mean - self._fragment_size_standard_deviation
+		factor = self.get_multiplication_factor(
+			dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
+			file_format="fasta", sequence_type="dna", ambiguous=True)
+
 		self._logger.debug("Multiplication factor: {}".format(factor))
 		self._simulate_reads(dict_id_abundance, dict_id_file_path, factor, directory_output)
 
