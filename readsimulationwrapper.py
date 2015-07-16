@@ -26,7 +26,11 @@ import maf_converter
 
 
 class ReadSimulationWrapper(GenomePreparation):
+	"""
+	Default CLass for all read simulation wrappers
 
+	# TODO: validate genome: no description, still a problem with art illumina?
+	"""
 	_label = "ReadSimulationWrapper"
 
 	_temporary_files = set()
@@ -34,6 +38,26 @@ class ReadSimulationWrapper(GenomePreparation):
 	def __init__(
 		self, file_path_executable,
 		separator='\t', max_processes=1, logfile=None, verbose=True, debug=False, seed=None, tmp_dir=None):
+		"""
+		Constructor
+
+		@param file_path_executable:
+		@type file_path_executable: str | unicode
+		@param separator: separator to be expected in metadata files
+		@type separator: str | unicode
+		@param max_processes: Maximum number of processors simulating reads at the same time
+		@type max_processes: int | long
+		@param logfile: file handler or file path to a log file
+		@type logfile: file | FileIO | StringIO | basestring
+		@param verbose: Not verbose means that only warnings and errors will be past to stream
+		@type verbose: bool
+		@param debug: If true temporary files will be kept
+		@type debug: bool
+		@param seed: Seed used for read simulator, if option available
+		@type seed: object
+		@param tmp_dir: Directory for storage of temporary files
+		@type tmp_dir: int | long
+		"""
 		assert self.validate_file(file_path_executable, executable=True)
 		assert isinstance(verbose, bool)
 		assert isinstance(debug, bool)
@@ -44,6 +68,7 @@ class ReadSimulationWrapper(GenomePreparation):
 		else:
 			tmp_dir = tempfile.gettempdir()
 		self._tmp_dir = tmp_dir
+		self._debug = debug
 		if seed is not None:
 			seed = hash(seed)
 			assert len(str(seed)) > 4, "Seed '{}' is too short!".format(seed)
@@ -56,26 +81,29 @@ class ReadSimulationWrapper(GenomePreparation):
 		self._fragment_size_standard_deviation = int(round(self._fragments_size_mean * 0.1))
 		self._read_length = 150
 
-	def __exit__(self, type, value, traceback):
-		self._close()
-
-	def __enter__(self):
-		return self
-
-	def __del__(self):
-		self._close()
-
 	def _close(self):
+		"""
+		Remove temporary files
+		"""
 		self._logger = None
 		# delete temporary files
+		if self._debug:
+			return
 		for file_path in self._temporary_files:
 			if os.path.isfile(file_path):
 				os.remove(file_path)
 
-	# TODO: validate genome: no description, still a problem ?
-
 	# read genome location file
 	def _read_genome_location_file(self, file_path):
+		"""
+		Read file with the file paths of gnomes
+
+		@param file_path: File genome id associated with the file path of a genome
+		@type file_path: str | unicode
+
+		@return: Dictionary of genome id to file path
+		@rtype: dict[str|unicode, str|unicode]
+		"""
 		self._logger.info('Reading genome location file')
 		dict_id_file_path = {}
 		metadata_table = MetadataTable(logfile=self._logfile, verbose=self._verbose, separator=self._separator)
@@ -90,34 +118,16 @@ class ReadSimulationWrapper(GenomePreparation):
 			dict_id_file_path[genome_id] = file_path_genome
 		return dict_id_file_path
 
-	def get_multiplication_factor(
-		self, dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
-		file_format="fasta", sequence_type="dna", ambiguous=True):
-
-		# factor is calculated based on total size of sample
-		# coverage = abundance * factor
-
-		relative_size_total = 0
-		for genome_id, abundance in dict_id_abundance.iteritems():
-			min_seq_length, genome_length = self.get_sequence_lengths(
-				file_path=dict_id_file_path[genome_id],
-				file_format=file_format,
-				sequence_type=sequence_type,
-				ambiguous=ambiguous,
-				key=None,
-				silent=False)
-			if min_seq_length < min_sequence_length:
-				new_file_path = self._remove_short_sequences(
-					dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
-				dict_id_file_path[genome_id] = new_file_path
-				self._temporary_files.add(new_file_path)
-
-			relative_size = abundance * genome_length
-			relative_size_total += relative_size
-		return total_size / float(relative_size_total)
-
-	# read genome distribution file
 	def _read_distribution_file(self, file_path):
+		"""
+		Read file with the distribution of a sample
+
+		@param file_path: File genome id associated with the abundance of a genome
+		@type file_path: str | unicode
+
+		@return: Dictionary of genome id to file path
+		@rtype: dict[str|unicode, float]
+		"""
 		self._logger.info('Genome distribution preparation')
 		dict_id_abundance = {}
 		# dict_id_file_path = {}
@@ -138,29 +148,95 @@ class ReadSimulationWrapper(GenomePreparation):
 		# return dict_id_abundance, dict_id_file_path, relative_size_total, max_abundance
 		return dict_id_abundance
 
-	def _remove_short_sequences(self, file_path, sequence_min_length, file_format="fasta"):
+	def get_multiplication_factor(
+		self, dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
+		file_format="fasta", sequence_type="dna", ambiguous=True):
+		"""
+		A factor is calculated based on total size of a sample to calculate the required covered
+		# coverage = abundance * factor
+		Files will be validated while the length of sequences are determined.
+
+		@attention min_sequence_length: Sequences that are shorter than the expected fragment size are removed
+
+		@param dict_id_file_path: Dictionary of genome id to file path
+		@type dict_id_file_path: dict[str|unicode, str|unicode]
+		@param dict_id_abundance: Dictionary of genome id to abundance
+		@type dict_id_abundance: dict[str|unicode, float]
+		@param total_size: Size of sample in base pairs
+		@type total_size: int | long
+		@param min_sequence_length: Minimum length of a sequence in base pairs
+		@type min_sequence_length: int | long
+		@param file_format: fasta or fastq
+		@type file_format: str | unicode
+		@param sequence_type: dna or rna or protein
+		@type sequence_type: str | unicode
+		@param ambiguous: DNA example for strict 'GATC',  ambiguous example 'GATCRYWSMKHBVDN'
+		@type ambiguous: bool
+
+		@return: Factor abundances will be multiplied by
+		@rtype: float
+		"""
+
+		relative_size_total = 0
+		for genome_id, abundance in dict_id_abundance.iteritems():
+			min_seq_length, genome_length = self.get_sequence_lengths(
+				file_path=dict_id_file_path[genome_id],
+				file_format=file_format,
+				sequence_type=sequence_type,
+				ambiguous=ambiguous,
+				key=None,
+				silent=False)
+			if min_seq_length < min_sequence_length:
+				new_file_path = self._remove_short_sequences(
+					dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
+				dict_id_file_path[genome_id] = new_file_path
+				self._temporary_files.add(new_file_path)
+
+			relative_size = abundance * genome_length
+			relative_size_total += relative_size
+		return total_size / float(relative_size_total)
+
+	def _remove_short_sequences(self, file_path, min_sequence_length, file_format="fasta"):
+		"""
+		Copies a genome with sequences shorter than a minimum removed.
+
+		@param file_path: File genome id associated with the abundance of a genome
+		@type file_path: str | unicode
+		@param min_sequence_length: Minimum length of a sequence in base pairs
+		@type min_sequence_length: int | long
+		@param file_format:
+		@type file_format: str | unicode
+
+		@return: File path of the genome with removed short sequences
+		@rtype: str | unicode
+		"""
 		file_path_output = tempfile.mktemp(dir=self._tmp_dir)
 		with open(file_path, 'w') as stream_input, open(file_path_output, 'w') as stream_output:
 			self._stream_sequences_of_min_length(
 				stream_input, stream_output,
-				sequence_min_length=sequence_min_length,
+				sequence_min_length=min_sequence_length,
 				file_format=file_format
 				)
 		return file_path_output
 
 
 # #################
-# ReadSimulationArt
+# ReadSimulationArt - Art-Illumina Wrapper
 # #################
 
 
 class ReadSimulationArt(ReadSimulationWrapper):
+	"""
+	Simulate reads using art illumina
+	Currently pair-end reads only!
+	"""
 	_label = "ReadSimulationArtIllumina"
 
 	_art_error_profiles = {
 		"mi": "EmpMiSeq250R",
 		"hi": "EmpHiSeq2kR",
 		"hi150": "HiSeq2500L150R"}
+
 	_art_read_length = {
 		"mi": 250,
 		"hi": 100,
@@ -168,19 +244,39 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 	def __init__(self, file_path_executable, directory_error_profiles, **kwargs):
 		super(ReadSimulationArt, self).__init__(file_path_executable, **kwargs)
+		# check availability of profiles
 		file_names_of_error_profiles = [
 			filename+file_end
 			for ep, filename in self._art_error_profiles.iteritems()
 			for file_end in ['1.txt', '2.txt']
 			]
 		assert self.validate_dir(directory_error_profiles, file_names=file_names_of_error_profiles)
+		# set default profile
 		self._profile = "hi150"
 		self._read_length = self._art_read_length["hi150"]
 		self._directory_error_profiles = directory_error_profiles
 
 	def simulate(
 		self, file_path_distributions, file_path_genome_locations, directory_output,
-		total_size, profile, fragments_size_mean, fragment_size_standard_deviation):  # , read_size=None
+		total_size, profile, fragments_size_mean, fragment_size_standard_deviation):
+		"""
+		Simulate reads based on a given sample distribution
+
+		@param file_path_distributions: File genome id associated with the abundance of a genome
+		@type file_path_distributions: str | unicode
+		@param file_path_genome_locations: File genome id associated with the file path of a genome
+		@type file_path_genome_locations: str | unicode
+		@param directory_output: Directory for the sam and fastq files output
+		@type directory_output: str | unicode
+		@param total_size: Size of sample in base pairs
+		@type total_size: int | long
+		@param profile: Art illumina error profile: 'low', 'mi', 'hi', 'hi150'
+		@type profile: str | unicode
+		@param fragments_size_mean: Size of the fragment of which the ends are used as reads in base pairs
+		@type fragments_size_mean: int | long
+		@param fragment_size_standard_deviation: Standard deviation of the fragment size in base pairs.
+		@type fragment_size_standard_deviation: int | long
+		"""
 		if profile is not None:
 			assert profile in self._art_error_profiles, "Unknown art illumina profile: '{}'".format(profile)
 			assert profile in self._art_read_length,  "Unknown art illumina profile: '{}'".format(profile)
@@ -211,13 +307,25 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 	# start ART readsimulator
 	def _simulate_reads(self, dict_id_abundance, dict_id_file_path, factor, directory_output):
+		"""
+		Parallel simulation of reads
+
+		@param dict_id_abundance: Dictionary of genome id to abundance
+		@type dict_id_abundance: dict[str|unicode, float]
+		@param dict_id_file_path: Dictionary of genome id to file path
+		@type dict_id_file_path: dict[str|unicode, str|unicode]
+		@param factor: Factor abundances will be multiplied by
+		@type factor: float
+		@param directory_output: Directory for the sam and fastq files output
+		@type directory_output: str | unicode
+		"""
 		self._logger.info("Simulating reads using art Illumina readsimulator...")
 		# add commands to a list of tasks to run them in parallel instead of calling them sequentially
 		tasks = []
 		for source_data_id in dict_id_abundance.keys():
 			file_path_input = dict_id_file_path[source_data_id]
 			abundance = dict_id_abundance[source_data_id]
-			fold_coverage = float(abundance) * factor
+			fold_coverage = long(round(abundance * factor))
 			file_path_output_prefix = os.path.join(directory_output, str(source_data_id))
 			self._logger.debug("{id}\t{fold_coverage}".format(id=source_data_id, fold_coverage=fold_coverage))
 			system_command = self._get_sys_cmd(
@@ -226,10 +334,6 @@ class ReadSimulationArt(ReadSimulationWrapper):
 				file_path_output_prefix=file_path_output_prefix)
 			self._logger.debug("SysCmd: '{}'".format(system_command))
 			self._logger.info("Simulating reads from '{}'".format(file_path_input))
-			# print ('start illumina\n')
-			# os.system(reader_folder+'art_illumina -sam -i '+directory_output+seq_id+'.fa -l 99 -f '+str(new_abundance)+'
-			#  -m 450 -s 25 -o '+directory_output+str(seq_id)+' -1 '+error_profile+'1.txt -2 '+error_profile+'2.txt -na
-			#  > /dev/null')
 			tasks.append(TaskCmd(system_command))
 		list_of_fails = runCmdParallel(tasks, maxProc=self._max_processes)
 		if list_of_fails is not None:
@@ -237,8 +341,20 @@ class ReadSimulationArt(ReadSimulationWrapper):
 			reportFailedCmd(list_of_fails)
 		self._logger.info("Simulating reads finished")
 
-	def _get_sys_cmd(
-		self, file_path_input, fold_coverage, file_path_output_prefix):
+	def _get_sys_cmd(self, file_path_input, fold_coverage, file_path_output_prefix):
+		"""
+		Build system command to be run.
+
+		@param file_path_input: Path to genome fasta file
+		@type file_path_input: str | unicode
+		@param fold_coverage: coverage of a genome
+		@type fold_coverage: int | long
+		@param file_path_output_prefix: Output prefix used by art illumina
+		@type file_path_output_prefix: str | unicode
+
+		@return: System command to run art illumina
+		@rtype: str | unicode
+		"""
 		# TODO: mask 'N' default: '-nf 1'
 		read_length = self._art_read_length[self._profile]
 		error_profile = os.path.join(self._directory_error_profiles, self._art_error_profiles[self._profile])
