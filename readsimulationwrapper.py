@@ -167,7 +167,6 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		"hi150": 150}
 
 	def __init__(self, file_path_executable, directory_error_profiles, **kwargs):
-		# TODO: check profile availability
 		super(ReadSimulationArt, self).__init__(file_path_executable, **kwargs)
 		file_names_of_error_profiles = [
 			filename+file_end
@@ -268,6 +267,16 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 
 # #################
+# #################
+#
+# FUTURE WORK:
+# 	ReadSimulationPirs
+# 	ReadSimulationPBSIM
+#
+# #################
+# #################
+
+# #################
 # ReadSimulationPirs
 # #################
 
@@ -285,14 +294,15 @@ class ReadSimulationPirs(ReadSimulationWrapper):
 		self._fragments_size_mean = fragments_size_mean
 		self._fragment_size_standard_deviation = fragment_size_standard_deviation
 
-		min_length = self._fragments_size_mean - self._fragment_size_standard_deviation
-		dict_id_abundance, relative_size_total, max_abundance = self._read_distribution_file(
-			file_path_distributions, min_length)
+		dict_id_abundance = self._read_distribution_file(file_path_distributions)
 		dict_id_file_path = self._read_genome_location_file(file_path_genome_locations)
 
 		# coverage = abundance * factor
 		# factor is calculated based on total size of sample
-		factor = total_size/float(relative_size_total)
+		min_sequence_length = self._fragments_size_mean - self._fragment_size_standard_deviation
+		factor = self.get_multiplication_factor(
+			dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
+			file_format="fasta", sequence_type="dna", ambiguous=True)
 		self._logger.debug("Multiplication factor: {}".format(factor))
 		self._simulate_reads(dict_id_abundance, dict_id_file_path, factor, directory_output)
 
@@ -338,14 +348,15 @@ class ReadSimulationPBSIM(ReadSimulationWrapper):
 		self._fragments_size_mean = fragments_size_mean
 		self._fragment_size_standard_deviation = fragment_size_standard_deviation
 
-		min_length = self._fragments_size_mean - self._fragment_size_standard_deviation
-		dict_id_abundance, relative_size_total, max_abundance = self._read_distribution_file(
-			file_path_distributions, min_length)
+		dict_id_abundance = self._read_distribution_file(file_path_distributions)
 		dict_id_file_path = self._read_genome_location_file(file_path_genome_locations)
 
 		# coverage = abundance * factor
 		# factor is calculated based on total size of sample
-		factor = total_size/float(relative_size_total)
+		min_sequence_length = self._fragments_size_mean - self._fragment_size_standard_deviation
+		factor = self.get_multiplication_factor(
+			dict_id_file_path, dict_id_abundance, total_size, min_sequence_length,
+			file_format="fasta", sequence_type="dna", ambiguous=True)
 		self._logger.debug("Multiplication factor: {}".format(factor))
 		self._simulate_reads(dict_id_abundance, dict_id_file_path, factor, directory_output)
 
