@@ -260,7 +260,7 @@ class GenomePreparation(SequenceValidator):
 			@type silent: bool
 
 			@return: True if the file is correctly formatted
-			@rtype: False | tuple[int|long, int|long]
+			@rtype: tuple[int|long, int|long]
 		"""
 		assert self.validate_file(file_path)
 		assert isinstance(file_format, basestring)
@@ -280,20 +280,20 @@ class GenomePreparation(SequenceValidator):
 
 		set_of_seq_id = set()
 		total_length = 0
+		sequence_count = 0
+		min_sequence_length = None
 		with open(file_path) as file_handle:
 			if not self._validate_file_start(file_handle, file_format):
-				if not silent:
-					self._logger.error("{}Invalid beginning of file '{}'.".format(prefix, os.path.basename(file_path)))
-				return False
-			sequence_count = 0
-			min_sequence_length = None
+				msg = "{}Invalid beginning of file '{}'.".format(prefix, os.path.basename(file_path))
+				self._logger.error(msg)
+				raise IOError(msg)
 			try:
 				for seq_record in SeqIO.parse(file_handle, file_format, alphabet=alphabet):
 					sequence_count += 1
 					if not self._validate_sequence_record(seq_record, set_of_seq_id, file_format, key=None, silent=False):
-						if not silent:
-							self._logger.error("{}{}. sequence '{}' is invalid.".format(prefix, sequence_count, seq_record.id))
-						return False
+						msg = "{}{}. sequence '{}' is invalid.".format(prefix, sequence_count, seq_record.id)
+						self._logger.error(msg)
+						raise IOError(msg)
 					if not min_sequence_length:
 						min_sequence_length = len(seq_record.seq)
 					total_length += len(seq_record.seq)
@@ -301,8 +301,9 @@ class GenomePreparation(SequenceValidator):
 						min_sequence_length = len(seq_record.seq)
 			except Exception as e:
 				if not silent:
-					self._logger.error("{}Corrupt sequence in file '{}'.\nException: {}".format(
-						prefix, os.path.basename(file_path), e.message))
+					msg = "{}Corrupt sequence in file '{}'.\nException: {}".format(prefix, os.path.basename(file_path), e.message)
+					self._logger.error(msg)
+					raise IOError(msg)
 				return False
 		if sequence_count == 0:
 			return 0, 0
