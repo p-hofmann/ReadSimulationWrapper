@@ -27,13 +27,11 @@ import maf_converter
 
 class ReadSimulationWrapper(GenomePreparation):
 	"""
-	Default CLass for all read simulation wrappers
+	Default Class for all read simulation wrappers
 
-	# TODO: validate genome: no description, still a problem with art illumina?
+	# TODO: validate genome: description still a problem for art illumina?
 	"""
 	_label = "ReadSimulationWrapper"
-
-	_temporary_files = set()
 
 	def __init__(
 		self, file_path_executable,
@@ -80,6 +78,7 @@ class ReadSimulationWrapper(GenomePreparation):
 		self._fragments_size_mean = float(270)
 		self._fragment_size_standard_deviation = int(round(self._fragments_size_mean * 0.1))
 		self._read_length = 150
+		self._temporary_files = set()
 
 	def _close(self):
 		"""
@@ -87,11 +86,15 @@ class ReadSimulationWrapper(GenomePreparation):
 		"""
 		self._logger = None
 		# delete temporary files
+		self._remove_temporary_files()
+
+	def _remove_temporary_files(self):
 		if self._debug:
 			return
 		for file_path in self._temporary_files:
 			if os.path.isfile(file_path):
 				os.remove(file_path)
+			self._temporary_files.pop(file_path)
 
 	# read genome location file
 	def _read_genome_location_file(self, file_path):
@@ -179,18 +182,26 @@ class ReadSimulationWrapper(GenomePreparation):
 
 		relative_size_total = 0
 		for genome_id, abundance in dict_id_abundance.iteritems():
-			min_seq_length, genome_length = self.get_sequence_lengths(
-				file_path=dict_id_file_path[genome_id],
-				file_format=file_format,
-				sequence_type=sequence_type,
-				ambiguous=ambiguous,
-				key=None,
-				silent=False)
-			if min_seq_length < min_sequence_length:
-				new_file_path = self._remove_short_sequences(
-					dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
-				dict_id_file_path[genome_id] = new_file_path
-				self._temporary_files.add(new_file_path)
+			try:
+				min_seq_length, genome_length = self.get_sequence_lengths(
+					file_path=dict_id_file_path[genome_id],
+					file_format=file_format,
+					sequence_type=sequence_type,
+					ambiguous=ambiguous,
+					key=None,
+					silent=False)
+
+				if min_seq_length < min_sequence_length:
+					self._logger.info("Genome '{}' has sequences below minimum, creating filtered copy.".format(genome_id))
+					new_file_path = self._remove_short_sequences(
+						dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
+					dict_id_file_path[genome_id] = new_file_path
+					self._temporary_files.add(new_file_path)
+					print new_file_path
+
+			except IOError as e:
+				self._remove_temporary_files()
+				raise e
 
 			relative_size = abundance * genome_length
 			relative_size_total += relative_size
@@ -211,12 +222,16 @@ class ReadSimulationWrapper(GenomePreparation):
 		@rtype: str | unicode
 		"""
 		file_path_output = tempfile.mktemp(dir=self._tmp_dir)
-		with open(file_path, 'w') as stream_input, open(file_path_output, 'w') as stream_output:
-			self._stream_sequences_of_min_length(
+		with open(file_path) as stream_input, open(file_path_output, 'w') as stream_output:
+			total_base_pairs = self._stream_sequences_of_min_length(
 				stream_input, stream_output,
 				sequence_min_length=min_sequence_length,
 				file_format=file_format
 				)
+			if total_base_pairs == 0:
+				msg = "No valid sequences > {} found!".format(min_sequence_length)
+				self._logger.error(msg)
+				raise IOError(msg)
 		return file_path_output
 
 
