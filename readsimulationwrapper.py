@@ -65,7 +65,7 @@ class ReadSimulationWrapper(GenomePreparation):
 			assert self.validate_dir(tmp_dir)
 		else:
 			tmp_dir = tempfile.gettempdir()
-		self._tmp_dir = tmp_dir
+		self._tmp_dir = self.get_full_path(tmp_dir)
 		self._debug = debug
 		if seed is not None:
 			seed = hash(seed)
@@ -197,7 +197,6 @@ class ReadSimulationWrapper(GenomePreparation):
 						dict_id_file_path[genome_id], min_sequence_length, file_format="fasta")
 					dict_id_file_path[genome_id] = new_file_path
 					self._temporary_files.add(new_file_path)
-					print new_file_path
 
 			except IOError as e:
 				self._remove_temporary_files()
