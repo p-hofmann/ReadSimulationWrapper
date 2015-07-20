@@ -57,6 +57,8 @@ class ReadSimulationWrapper(GenomePreparation):
 		@type tmp_dir: int | long
 		"""
 		assert self.validate_file(file_path_executable, executable=True)
+		assert isinstance(separator, basestring)
+		assert isinstance(max_processes, (int, long))
 		assert isinstance(verbose, bool)
 		assert isinstance(debug, bool)
 		assert seed is None or isinstance(seed, (long, int, float, basestring))
@@ -108,6 +110,7 @@ class ReadSimulationWrapper(GenomePreparation):
 		@rtype: dict[str|unicode, str|unicode]
 		"""
 		self._logger.info('Reading genome location file')
+		assert self.validate_file(file_path)
 		dict_id_file_path = {}
 		metadata_table = MetadataTable(logfile=self._logfile, verbose=self._verbose, separator=self._separator)
 		iterator_distributions = metadata_table.parse_file(file_path, as_list=True)
@@ -131,7 +134,8 @@ class ReadSimulationWrapper(GenomePreparation):
 		@return: Dictionary of genome id to file path
 		@rtype: dict[str|unicode, float]
 		"""
-		self._logger.info('Genome distribution preparation')
+		self._logger.info('Reading distribution file')
+		assert self.validate_file(file_path)
 		dict_id_abundance = {}
 		# dict_id_file_path = {}
 		metadata_table = MetadataTable(logfile=self._logfile, verbose=self._verbose, separator=self._separator)
@@ -179,6 +183,13 @@ class ReadSimulationWrapper(GenomePreparation):
 		@return: Factor abundances will be multiplied by
 		@rtype: float
 		"""
+		assert isinstance(dict_id_file_path, dict), "Expected dictionary, genome id as key, file path as value"
+		assert isinstance(dict_id_abundance, dict), "Expected dictionary, genome id as key, abundance as value"
+		assert isinstance(total_size, (int, long)), "Expected natural digit"
+		assert isinstance(min_sequence_length, (int, long)), "Expected natural digit"
+		assert isinstance(file_format, basestring), "Expected file format 'fasta'"
+		assert isinstance(sequence_type, basestring), "Expected sequence type 'rna' or 'dna' or 'protein'"
+		assert isinstance(ambiguous, bool)
 
 		relative_size_total = 0
 		for genome_id, abundance in dict_id_abundance.iteritems():
@@ -220,6 +231,10 @@ class ReadSimulationWrapper(GenomePreparation):
 		@return: File path of the genome with removed short sequences
 		@rtype: str | unicode
 		"""
+		assert self.validate_file(file_path)
+		assert isinstance(min_sequence_length, (int, long)), "Expected natural digit"
+		assert isinstance(file_format, basestring), "Expected file format 'fasta'"
+
 		file_path_output = tempfile.mktemp(dir=self._tmp_dir)
 		with open(file_path) as stream_input, open(file_path_output, 'w') as stream_output:
 			total_base_pairs = self._stream_sequences_of_min_length(
@@ -271,13 +286,13 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		self._directory_error_profiles = directory_error_profiles
 
 	def simulate(
-		self, file_path_distributions, file_path_genome_locations, directory_output,
+		self, file_path_distribution, file_path_genome_locations, directory_output,
 		total_size, profile, fragments_size_mean, fragment_size_standard_deviation):
 		"""
 		Simulate reads based on a given sample distribution
 
-		@param file_path_distributions: File genome id associated with the abundance of a genome
-		@type file_path_distributions: str | unicode
+		@param file_path_distribution: File genome id associated with the abundance of a genome
+		@type file_path_distribution: str | unicode
 		@param file_path_genome_locations: File genome id associated with the file path of a genome
 		@type file_path_genome_locations: str | unicode
 		@param directory_output: Directory for the sam and fastq files output
@@ -291,6 +306,13 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		@param fragment_size_standard_deviation: Standard deviation of the fragment size in base pairs.
 		@type fragment_size_standard_deviation: int | long
 		"""
+		assert isinstance(total_size, (int, long)), "Expected natural digit"
+		assert isinstance(fragments_size_mean, (int, long)), "Expected natural digit"
+		assert isinstance(fragment_size_standard_deviation, (int, long)), "Expected natural digit"
+		assert total_size > 0, "Total size needs to be a positive number"
+		assert fragments_size_mean > 0, "Mean fragments size needs to be a positive number"
+		assert fragment_size_standard_deviation > 0, "Fragment size standard deviation needs to be a positive number"
+		assert self.validate_dir(directory_output)
 		if profile is not None:
 			assert profile in self._art_error_profiles, "Unknown art illumina profile: '{}'".format(profile)
 			assert profile in self._art_read_length,  "Unknown art illumina profile: '{}'".format(profile)
@@ -307,7 +329,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 				assert fragment_size_standard_deviation is not None, "Both, mean and standard deviation, are required."
 		self._logger.info("Using '{}' error profile.".format(profile))
 
-		dict_id_abundance = self._read_distribution_file(file_path_distributions)
+		dict_id_abundance = self._read_distribution_file(file_path_distribution)
 		dict_id_file_path = self._read_genome_location_file(file_path_genome_locations)
 		assert set(dict_id_file_path.keys()).issuperset(dict_id_abundance.keys()), "Some ids do not have a genome location"
 
@@ -329,17 +351,22 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		@param dict_id_file_path: Dictionary of genome id to file path
 		@type dict_id_file_path: dict[str|unicode, str|unicode]
 		@param factor: Factor abundances will be multiplied by
-		@type factor: float
+		@type factor: float | int | long
 		@param directory_output: Directory for the sam and fastq files output
 		@type directory_output: str | unicode
 		"""
 		self._logger.info("Simulating reads using art Illumina readsimulator...")
+		assert isinstance(dict_id_file_path, dict), "Expected dictionary, genome id as key, file path as value"
+		assert isinstance(dict_id_abundance, dict), "Expected dictionary, genome id as key, abundance as value"
+		assert isinstance(factor, (int, long, float)), "Factor must be a digit"
+		assert self.validate_dir(directory_output)
+
 		# add commands to a list of tasks to run them in parallel instead of calling them sequentially
 		tasks = []
 		for genome_id in dict_id_abundance.keys():
 			file_path_input = dict_id_file_path[genome_id]
 			abundance = dict_id_abundance[genome_id]
-			fold_coverage = long(round(abundance * factor))
+			fold_coverage = abundance * factor
 			file_path_output_prefix = os.path.join(directory_output, str(genome_id))
 			self._logger.debug("{id}\t{fold_coverage}".format(id=genome_id, fold_coverage=fold_coverage))
 			system_command = self._get_sys_cmd(
@@ -362,13 +389,17 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		@param file_path_input: Path to genome fasta file
 		@type file_path_input: str | unicode
 		@param fold_coverage: coverage of a genome
-		@type fold_coverage: int | long
+		@type fold_coverage: int | long | float
 		@param file_path_output_prefix: Output prefix used by art illumina
 		@type file_path_output_prefix: str | unicode
 
 		@return: System command to run art illumina
 		@rtype: str | unicode
 		"""
+		assert self.validate_file(file_path_input)
+		assert isinstance(fold_coverage, (int, long, float))
+		assert self.validate_dir(file_path_output_prefix, only_parent=True)
+
 		# TODO: mask 'N' default: '-nf 1'
 		read_length = self._art_read_length[self._profile]
 		error_profile = os.path.join(self._directory_error_profiles, self._art_error_profiles[self._profile])
@@ -417,6 +448,7 @@ class ReadSimulationPirs(ReadSimulationWrapper):
 	def simulate(
 		self, file_path_distributions, file_path_genome_locations, directory_output,
 		total_size, read_length, fragments_size_mean, fragment_size_standard_deviation):
+		raise Exception("Not fully implemented yet")
 		assert self.validate_number(read_length, minimum=1)
 		assert self.validate_number(fragments_size_mean, minimum=1)
 		assert self.validate_number(fragment_size_standard_deviation, minimum=0)
@@ -471,6 +503,7 @@ class ReadSimulationPBSIM(ReadSimulationWrapper):
 	def simulate(
 		self, file_path_distributions, file_path_genome_locations, directory_output,
 		total_size, read_length, fragments_size_mean, fragment_size_standard_deviation):
+		raise Exception("Not fully implemented yet")
 		assert self.validate_number(read_length, minimum=1)
 		assert self.validate_number(fragments_size_mean, minimum=1)
 		assert self.validate_number(fragment_size_standard_deviation, minimum=0)
@@ -600,7 +633,7 @@ def main(args=None):
 		tmp_dir=options.directory_tmp)
 
 	simulator.simulate(
-		file_path_distributions=options.input_distribution,
+		file_path_distribution=options.input_distribution,
 		file_path_genome_locations=options.input_genome_loaction,
 		directory_output=options.directory_output,
 		total_size=options.total_size,
