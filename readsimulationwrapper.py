@@ -19,6 +19,7 @@ __author__ = 'Peter Hofmann'
 import os
 import argparse
 import tempfile
+import StringIO
 from scripts.parallel import TaskCmd, runCmdParallel, reportFailedCmd
 from scripts.MetaDataTable.metadatatable import MetadataTable
 from scripts.GenomePreparation.genomepreparation import GenomePreparation
@@ -72,7 +73,7 @@ class ReadSimulationWrapper(GenomePreparation):
 		if seed is not None:
 			seed = hash(seed)
 			assert len(str(seed)) > 4, "Seed '{}' is too short!".format(seed)
-		self._seed = seed
+		self._seed = hash(seed)
 		super(ReadSimulationWrapper, self).__init__(logfile=logfile, verbose=verbose)
 		self._max_processes = max_processes
 		self._separator = separator
@@ -377,6 +378,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 			self._logger.info("Simulating reads from {}: '{}'".format(genome_id, file_path_input))
 			tasks.append(TaskCmd(system_command))
 		list_of_fails = runCmdParallel(tasks, maxProc=self._max_processes)
+
 		if list_of_fails is not None:
 			self._logger.error("{} commands returned errors!".format(len(list_of_fails)))
 			reportFailedCmd(list_of_fails)
@@ -417,11 +419,13 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 		if self._logfile:
 			arguments.append(">> '{}'".format(self._logfile))
-		else:
-			arguments.append("> /dev/null")
+		# else:
+		# 	arguments.append("> /dev/null")
 
 		if self._seed:
-			arguments.append("-rs '{}'".format(self._logfile))
+			# hash of seed since art illumina only accepts integer as seed
+			arguments.append("-rs '{}'".format(self._seed))
+			self._seed += 1
 
 		cmd = "{exe} {args}".format(exe=self._file_path_executable, args=" ".join(arguments))
 		return cmd
