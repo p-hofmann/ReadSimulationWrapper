@@ -91,10 +91,10 @@ class ReadSimulationWrapper(GenomePreparation):
 	def _remove_temporary_files(self):
 		if self._debug:
 			return
-		for file_path in self._temporary_files:
+		while len(self._temporary_files) > 0:
+			file_path = self._temporary_files.pop()
 			if os.path.isfile(file_path):
 				os.remove(file_path)
-			self._temporary_files.pop(file_path)
 
 	# read genome location file
 	def _read_genome_location_file(self, file_path):
@@ -336,18 +336,18 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		self._logger.info("Simulating reads using art Illumina readsimulator...")
 		# add commands to a list of tasks to run them in parallel instead of calling them sequentially
 		tasks = []
-		for source_data_id in dict_id_abundance.keys():
-			file_path_input = dict_id_file_path[source_data_id]
-			abundance = dict_id_abundance[source_data_id]
+		for genome_id in dict_id_abundance.keys():
+			file_path_input = dict_id_file_path[genome_id]
+			abundance = dict_id_abundance[genome_id]
 			fold_coverage = long(round(abundance * factor))
-			file_path_output_prefix = os.path.join(directory_output, str(source_data_id))
-			self._logger.debug("{id}\t{fold_coverage}".format(id=source_data_id, fold_coverage=fold_coverage))
+			file_path_output_prefix = os.path.join(directory_output, str(genome_id))
+			self._logger.debug("{id}\t{fold_coverage}".format(id=genome_id, fold_coverage=fold_coverage))
 			system_command = self._get_sys_cmd(
 				file_path_input=file_path_input,
 				fold_coverage=fold_coverage,
 				file_path_output_prefix=file_path_output_prefix)
 			self._logger.debug("SysCmd: '{}'".format(system_command))
-			self._logger.info("Simulating reads from '{}'".format(file_path_input))
+			self._logger.info("Simulating reads from {}: '{}'".format(genome_id, file_path_input))
 			tasks.append(TaskCmd(system_command))
 		list_of_fails = runCmdParallel(tasks, maxProc=self._max_processes)
 		if list_of_fails is not None:
