@@ -1,20 +1,9 @@
 #!/usr/bin/python
 
-"""
-This program create reads from genomes by using art_Illumina Q version and the error profiles of MiSeq.
-
-input:
-	- distribution file with genome ID, abundance, genome length in bp
-	- genome location file with genome ID, file path
-output:     1st file: fastaq -format, 250bp long reads, Insert size 450bp with standard deviation 25%
-			2nd file: output in .sam format
-
-example for use:
-TODO:
-"""
-
 __original_author__ = 'majda'
-__author__ = 'Peter Hofmann'
+__author__ = 'peter hofmann'
+__version__ = '0.0.1'
+
 
 import os
 import argparse
