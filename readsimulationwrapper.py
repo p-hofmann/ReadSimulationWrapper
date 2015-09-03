@@ -2,7 +2,7 @@
 
 __original_author__ = 'majda'
 __author__ = 'peter hofmann'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 
 import os
@@ -60,9 +60,9 @@ class ReadSimulationWrapper(GenomePreparation):
 		self._tmp_dir = self.get_full_path(tmp_dir)
 		self._debug = debug
 		if seed is not None:
-			seed = hash(seed)
+			seed = abs(hash(seed))
 			assert len(str(seed)) > 4, "Seed '{}' is too short!".format(seed)
-		self._seed = hash(seed)
+		self._seed = abs(hash(seed))
 		super(ReadSimulationWrapper, self).__init__(logfile=logfile, verbose=verbose)
 		self._max_processes = max_processes
 		self._separator = separator
