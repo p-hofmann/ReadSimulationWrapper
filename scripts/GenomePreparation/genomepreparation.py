@@ -1,4 +1,5 @@
-__author__ = 'hofmann'
+__author__ = 'peter hofmann'
+__version__ = '0.0.2'
 
 
 import os
@@ -19,8 +20,9 @@ class GenomePreparation(SequenceValidator):
 
 	_filename_seq_map = "sequence_id_map.txt"
 
-	def write_genome_id_to_path_map(self, file_path_output, genome_id_to_path_map):
+	def write_genome_id_to_path_map(self, genome_id_to_path_map, file_path_output):
 		"""
+		Write mapping of genome id to genome file path to a file.
 
 		@param file_path_output: File path
 		@type file_path_output: file | FileIO | StringIO
@@ -32,6 +34,7 @@ class GenomePreparation(SequenceValidator):
 
 	def _stream_genome_id_to_path_map(self, stream_out, genome_id_to_path_map):
 		"""
+		Write mapping of genome id to genome file path to a stream.
 
 		@param stream_out: Stream like object
 		@type stream_out: file | FileIO | StringIO
@@ -54,15 +57,18 @@ class GenomePreparation(SequenceValidator):
 		@return: genome ids mapped to their gnome file path
 		@rtype: dict[str|unicode, str|unicode]
 		"""
+		genome_id_to_path_map = {}
 		mdt = MetadataTable(logfile=self._logfile, verbose=self._verbose)
 		mdt.read(file_path_of_file_mapping_genome_id_to_paths)
-		genome_id_to_path_map = mdt.get_map(0, 1, unique_key=True)
-		assert set(genome_id_to_path_map.keys()).issuperset(list_of_drawn_genome_id)
+		if mdt.get_number_of_rows() > 0:
+			genome_id_to_path_map = mdt.get_map(0, 1, unique_key=True)
+		msg = "'{}' is missing one or more genome id".format(os.path.basename(file_path_of_file_mapping_genome_id_to_paths))
+		assert set(genome_id_to_path_map.keys()).issuperset(list_of_drawn_genome_id), msg
 		return {genome_id: genome_id_to_path_map[genome_id] for genome_id in list_of_drawn_genome_id}
 
 	def _move_genome_file(
 		self, file_path_input, file_path_output,
-		stream_map, genome_id, sequence_min_length=0, set_of_sequence_names=None, file_format="fasta"):
+		stream_map, genome_id, sequence_min_length=1, set_of_sequence_names=None, file_format="fasta"):
 		"""
 		Move genomes into project folder, cleaning it up in the process.
 		Makes sure sequence ids are unique and descriptions/comments are removed
@@ -101,6 +107,7 @@ class GenomePreparation(SequenceValidator):
 		self, stream_input, stream_output, stream_map,
 		genome_id, sequence_min_length, set_of_sequence_names, file_format="fasta"):
 		"""
+		Rename ids that are not unique and remove sequences that are shorter than a given minimum
 
 		@attention file_format: Anything but 'fasta' is not supported, yet
 
@@ -142,6 +149,7 @@ class GenomePreparation(SequenceValidator):
 	def _stream_sequences_of_min_length(
 		self, stream_input, stream_output, sequence_min_length, file_format="fasta"):
 		"""
+		Stream sequences of a minimum length
 
 		@attention file_format: Anything but 'fasta' is not supported, yet
 
@@ -308,9 +316,3 @@ class GenomePreparation(SequenceValidator):
 		if sequence_count == 0:
 			return 0, 0
 		return min_sequence_length, total_length
-
-# if len(seq_record.seq) < min_length_sequence:
-# 	if not silent:
-# 		self._logger.error("{}{}. sequence '{}' is too small. {} < {}".format(
-# 			prefix, sequence_count, seq_record.id, len(seq_record.seq), min_length_sequence))
-# 	return False

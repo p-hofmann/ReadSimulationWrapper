@@ -1,5 +1,5 @@
 __author__ = 'hofmann'
-__version__ = '0.1.2'
+__version__ = '0.1.6'
 
 import os
 import glob
@@ -68,10 +68,9 @@ class Validator(DefaultLogging):
 
 		if file_path is None:
 			if not silent:
-				self._logger.error("{}Invalid directory".format(prefix))
+				self._logger.error("{}Invalid file path!".format(prefix))
 			return False
 
-		# file_path = self.get_full_path(file_path)
 		parent_directory, filename = os.path.split(file_path)
 
 		if parent_directory and not self.validate_dir(parent_directory, key=key):
@@ -86,6 +85,8 @@ class Validator(DefaultLogging):
 				if os.path.isfile(exe_file):
 					file_path = exe_file
 					break
+		else:
+			file_path = self.get_full_path(file_path)
 
 		if not os.path.isfile(file_path):
 			if not silent:
@@ -220,6 +221,17 @@ class Validator(DefaultLogging):
 			@rtype: str
 		"""
 		assert isinstance(value, basestring)
+
+		parent_directory, filename = os.path.split(value)
+
+		if not parent_directory and not os.path.isfile(value):
+			for path in os.environ["PATH"].split(os.pathsep):
+				path = path.strip('"')
+				exe_file = os.path.join(path, filename)
+				if os.path.isfile(exe_file):
+					value = exe_file
+					break
+
 		value = os.path.expanduser(value)
 		value = os.path.normpath(value)
 		value = os.path.abspath(value)
