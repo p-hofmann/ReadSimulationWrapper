@@ -15,6 +15,10 @@ This generates a datavolume of 10000 base pairs in total.
 	-sd 27 \
 	-m 270
 
+### More options available
+
+Use "-seed myseed" for consitent results. Or "-p 10" to use 10 cores at the same time.
+
 ## Formats
 
 ### abundance.tsv
