@@ -2,6 +2,9 @@
 Wrapper for the simulation of reads
 
 ## Usage
+
+This generates a datavolume of 10000 base pairs in total.
+
 	python "readsimulationwrapper.py" 10000 \
 	-i abundance.tsv \
 	-l genome_locations.tsv \
