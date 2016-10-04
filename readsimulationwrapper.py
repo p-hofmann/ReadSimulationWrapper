@@ -248,7 +248,7 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 	"""
 	_label = "ReadSimulationWgsim"
 
-	_wgsim_options = ['errorfree', 'standard'] #TODO make options fully customizable?
+	wgsim_options = ['errorfree', 'standard'] #TODO make options fully customizable?
 
 	def __init__(self, file_path_executable, directory_error_profiles, **kwargs):
 		super(ReadSimulationWgsim, self).__init__(file_path_executable, **kwargs)
@@ -282,8 +282,9 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 		assert fragments_size_mean > 0, "Mean fragments size needs to be a positive number"
 		assert fragment_size_standard_deviation > 0, "Fragment size standard deviation needs to be a positive number"
 		assert self.validate_dir(directory_output)
+		profile = profile.lower()
 		if profile is not None:
-			assert profile in self._wgsim_options
+			assert profile in self.wgsim_options, "Unknown profile: '{}'".format(profile)
 			self._profile = profile
 
 		if fragments_size_mean and fragment_size_standard_deviation:
@@ -724,7 +725,7 @@ def main(args=None):
 		-i abundance.tsv \\
 		-l genome_locations.tsv \\
 		-o dir_output/ \\
-		-art art_illumina \\
+		-exe path_to_executable \\
 		-epd dir_profile/ \\
 		-ep "hi150" \\
 		-sd 27 \\
@@ -788,10 +789,10 @@ def main(args=None):
 
 	group_input = parser.add_argument_group('ART arguments')
 	group_input.add_argument(
-		"-art", "--executable",
+		"-exe", "--executable",
 		default="art_illumina",
 		type=str,
-		help="File path to ART illumina executable.")
+		help="File path to read simulator executable.")
 
 	group_input.add_argument(
 		"-epd", "--error_profile_dir",
@@ -799,12 +800,18 @@ def main(args=None):
 		type=str,
 		help="Path to directory containing ART error profiles")
 
+	choices_error_profiles = ReadSimulationWgsim.wgsim_options + ReadSimulationArt._art_error_profiles.keys()
 	group_input.add_argument(
 		"-ep", "--error_profile",
 		default="hi150",
 		type=str,
-		choices=ReadSimulationArt._art_error_profiles.keys(),  # ["mi", "hi", "hi150"],
-		help="mi: MiSeq, hi: HiSeq 100, hi150: HiSeq 150")
+		choices=choices_error_profiles,  # ["mi", "hi", "hi150"],
+		help="""
+		wgsim:
+			'errorfree', 'standard,
+		art:
+			'mi': MiSeq, 'hi': HiSeq 100, 'hi150': HiSeq 150
+		""")
 
 	group_input.add_argument(
 		"-sd", "--fragment_size_standard_deviation",
@@ -827,23 +834,37 @@ def main(args=None):
 	file_path_executable = options.executable
 	directory_error_profiles = options.error_profile_dir
 
-	simulator = ReadSimulationArt(
-		file_path_executable=file_path_executable,
-		directory_error_profiles=directory_error_profiles,
-		separator='\t',
-		max_processes=options.processor_pool,
-		logfile=options.logfile,
-		verbose=True,
-		debug=False,
-		seed=options.seed,
-		tmp_dir=options.directory_tmp)
+	error_profile = options.error_profile.lower()
+
+	if error_profile in ReadSimulationWgsim.wgsim_options:
+		simulator = ReadSimulationWgsim(
+			file_path_executable=file_path_executable,
+			directory_error_profiles=None,
+			separator='\t',
+			max_processes=options.processor_pool,
+			logfile=options.logfile,
+			verbose=True,
+			debug=False,
+			seed=options.seed,
+			tmp_dir=options.directory_tmp)
+	else:
+		simulator = ReadSimulationArt(
+			file_path_executable=file_path_executable,
+			directory_error_profiles=directory_error_profiles,
+			separator='\t',
+			max_processes=options.processor_pool,
+			logfile=options.logfile,
+			verbose=True,
+			debug=False,
+			seed=options.seed,
+			tmp_dir=options.directory_tmp)
 
 	simulator.simulate(
 		file_path_distribution=options.abundance_profile,
 		file_path_genome_locations=options.genome_loactions,
 		directory_output=options.directory_output,
 		total_size=options.total_size,
-		profile=options.error_profile.lower(),
+		profile=error_profile,
 		fragments_size_mean=options.fragments_size_mean,
 		fragment_size_standard_deviation=options.fragment_size_standard_deviation)
 
