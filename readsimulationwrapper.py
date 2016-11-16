@@ -248,7 +248,7 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 	"""
 	_label = "ReadSimulationWgsim"
 
-	wgsim_options = ['errorfree', 'standard'] #TODO make options fully customizable?
+	error_profiles = ['errorfree', 'standard']  # TODO make options fully customizable?
 
 	def __init__(self, file_path_executable, directory_error_profiles, **kwargs):
 		super(ReadSimulationWgsim, self).__init__(file_path_executable, **kwargs)
@@ -284,7 +284,7 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 		assert self.validate_dir(directory_output)
 		profile = profile.lower()
 		if profile is not None:
-			assert profile in self.wgsim_options, "Unknown profile: '{}'".format(profile)
+			assert profile in self.error_profiles, "Unknown profile: '{}'".format(profile)
 			self._profile = profile
 
 		if fragments_size_mean and fragment_size_standard_deviation:
@@ -410,7 +410,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 	"""
 	_label = "ReadSimulationArtIllumina"
 
-	_art_error_profiles = {
+	error_profiles = {
 		"mi": "EmpMiSeq250R",
 		"hi": "EmpHiSeq2kR",
 		"hi150": "HiSeq2500L150R"}
@@ -425,7 +425,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		# check availability of profiles
 		file_names_of_error_profiles = [
 			filename+file_end
-			for ep, filename in self._art_error_profiles.iteritems()
+			for ep, filename in self.error_profiles.iteritems()
 			for file_end in ['1.txt', '2.txt']
 			]
 		assert self.validate_dir(directory_error_profiles, file_names=file_names_of_error_profiles)
@@ -463,7 +463,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		assert fragment_size_standard_deviation > 0, "Fragment size standard deviation needs to be a positive number"
 		assert self.validate_dir(directory_output)
 		if profile is not None:
-			assert profile in self._art_error_profiles, "Unknown art illumina profile: '{}'".format(profile)
+			assert profile in self.error_profiles, "Unknown art illumina profile: '{}'".format(profile)
 			assert profile in self._art_read_length,  "Unknown art illumina profile: '{}'".format(profile)
 			self._profile = profile
 		if fragments_size_mean and fragment_size_standard_deviation:
@@ -552,7 +552,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 		# TODO: mask 'N' default: '-nf 1'
 		read_length = self._art_read_length[self._profile]
-		error_profile = os.path.join(self._directory_error_profiles, self._art_error_profiles[self._profile])
+		error_profile = os.path.join(self._directory_error_profiles, self.error_profiles[self._profile])
 		arguments = [
 			"-sam", "-na",
 			"-i '{}'".format(file_path_input),
@@ -800,7 +800,7 @@ def main(args=None):
 		type=str,
 		help="Path to directory containing ART error profiles")
 
-	choices_error_profiles = ReadSimulationWgsim.wgsim_options + ReadSimulationArt._art_error_profiles.keys()
+	choices_error_profiles = ReadSimulationWgsim.error_profiles + ReadSimulationArt.error_profiles.keys()
 	group_input.add_argument(
 		"-ep", "--error_profile",
 		default="hi150",
@@ -836,7 +836,7 @@ def main(args=None):
 
 	error_profile = options.error_profile.lower()
 
-	if error_profile in ReadSimulationWgsim.wgsim_options:
+	if error_profile in ReadSimulationWgsim.error_profiles:
 		simulator = ReadSimulationWgsim(
 			file_path_executable=file_path_executable,
 			directory_error_profiles=None,

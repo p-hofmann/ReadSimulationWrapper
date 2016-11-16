@@ -5,6 +5,8 @@ Wrapper for the simulation of reads
 
 This generates a datavolume of 10000 base pairs in total.
 
+Art Illumina:
+
 	python "readsimulationwrapper.py" 10000 \
 	-i abundance.tsv \
 	-l genome_locations.tsv \
@@ -12,6 +14,17 @@ This generates a datavolume of 10000 base pairs in total.
 	-art art_illumina \
 	-epd dir_profile/ \
 	-ep "hi150" \
+	-sd 27 \
+	-m 270
+
+wgsim:
+
+	python "readsimulationwrapper.py" 10000 \
+	-i abundance.tsv \
+	-l genome_locations.tsv \
+	-o dir_output/ \
+	-art art_illumina \
+	-ep "errorfree" \
 	-sd 27 \
 	-m 270
 
