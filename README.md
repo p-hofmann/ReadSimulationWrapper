@@ -3,7 +3,9 @@ Wrapper for the simulation of reads
 
 ## Usage
 
-This generates a datavolume of 10000 base pairs in total.
+This generates a data volume of 10000 base pairs in total. 
+The mean fragment size is 270 bp long with a standard deviation of 27 bp.
+Read length will be 150 bp.
 
 Art Illumina:
 
@@ -11,7 +13,7 @@ Art Illumina:
 	-i abundance.tsv \
 	-l genome_locations.tsv \
 	-o dir_output/ \
-	-art art_illumina \
+	-exe art_illumina \
 	-epd dir_profile/ \
 	-ep "hi150" \
 	-sd 27 \
@@ -23,8 +25,9 @@ wgsim:
 	-i abundance.tsv \
 	-l genome_locations.tsv \
 	-o dir_output/ \
-	-art art_illumina \
+	-exe wgsim \
 	-ep "errorfree" \
+	-r 150
 	-sd 27 \
 	-m 270
 
@@ -52,14 +55,14 @@ Tab separated.
 
 Search in "readsimulationwrapper.py" for the class definition of "ReadSimulationArt" and find the lines:
 
-	_art_error_profiles = {
+	error_profiles = {
 		"mi": "EmpMiSeq250R",
 		"hi": "EmpHiSeq2kR",
 		"hi150": "HiSeq2500L150R"}
 
 If someone made new profile files like "HiSeq_5000_L250R_1.txt" and "HiSeq_5000_L250R_2.txt", one only needs to add them like this:
 
-	_art_error_profiles = {
+	error_profiles = {
 		"mi": "EmpMiSeq250R",
 		"hi": "EmpHiSeq2kR",
 		"hi150": "HiSeq2500L150R",
