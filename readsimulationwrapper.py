@@ -2,7 +2,7 @@
 
 __original_author__ = 'majda'
 __author__ = 'peter hofmann'
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 
 import sys
@@ -256,7 +256,7 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 
 	def simulate(
 		self, file_path_distribution, file_path_genome_locations, directory_output,
-		total_size, profile, fragments_size_mean, fragment_size_standard_deviation):
+		total_size, profile, read_length, fragments_size_mean, fragment_size_standard_deviation):
 		"""
 		Simulate reads based on a given sample distribution
 
@@ -279,9 +279,11 @@ class ReadSimulationWgsim(ReadSimulationWrapper):
 		assert isinstance(fragments_size_mean, (int, long)), "Expected natural digit"
 		assert isinstance(fragment_size_standard_deviation, (int, long)), "Expected natural digit"
 		assert total_size > 0, "Total size needs to be a positive number"
+		assert read_length > 0, "Read length must be a positive number"
 		assert fragments_size_mean > 0, "Mean fragments size needs to be a positive number"
 		assert fragment_size_standard_deviation > 0, "Fragment size standard deviation needs to be a positive number"
 		assert self.validate_dir(directory_output)
+		self._read_length = read_length
 		profile = profile.lower()
 		if profile is not None:
 			assert profile in self.error_profiles, "Unknown profile: '{}'".format(profile)
@@ -436,7 +438,7 @@ class ReadSimulationArt(ReadSimulationWrapper):
 
 	def simulate(
 		self, file_path_distribution, file_path_genome_locations, directory_output,
-		total_size, profile, fragments_size_mean, fragment_size_standard_deviation):
+		total_size, profile, read_length, fragments_size_mean, fragment_size_standard_deviation):
 		"""
 		Simulate reads based on a given sample distribution
 
@@ -462,6 +464,8 @@ class ReadSimulationArt(ReadSimulationWrapper):
 		assert fragments_size_mean > 0, "Mean fragments size needs to be a positive number"
 		assert fragment_size_standard_deviation > 0, "Fragment size standard deviation needs to be a positive number"
 		assert self.validate_dir(directory_output)
+		if read_length > 0:
+			self._logger.warning("Read length argument ignored. Length is based on error profile.")
 		if profile is not None:
 			assert profile in self.error_profiles, "Unknown art illumina profile: '{}'".format(profile)
 			assert profile in self._art_read_length,  "Unknown art illumina profile: '{}'".format(profile)
@@ -726,7 +730,7 @@ def main(args=None):
 		-l genome_locations.tsv \\
 		-o dir_output/ \\
 		-exe path_to_executable \\
-		-epd dir_profile/ \\
+		-epd dir_art_profiles/ \\
 		-ep "hi150" \\
 		-sd 27 \\
 		-m 270
@@ -814,6 +818,12 @@ def main(args=None):
 		""")
 
 	group_input.add_argument(
+		"-r", "--read_length",
+		default=-1,
+		type=int,
+		help="standard deviation of fragment size in base pairs.")
+
+	group_input.add_argument(
 		"-sd", "--fragment_size_standard_deviation",
 		default=27,
 		type=int,
@@ -865,6 +875,7 @@ def main(args=None):
 		directory_output=options.directory_output,
 		total_size=options.total_size,
 		profile=error_profile,
+		read_length=options.read_length,
 		fragments_size_mean=options.fragments_size_mean,
 		fragment_size_standard_deviation=options.fragment_size_standard_deviation)
 
